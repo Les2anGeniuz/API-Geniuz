@@ -28,14 +28,16 @@ import adminActivitiesRoutes from "./routes/adminActivities.js";
 import adminPengumpulanTugasRoutes from "./routes/adminPengumpulanTugas.js";
 import notifikasiRoutes from "./routes/notifikasi.js";
 
-// Jangan auto-run worker di serverless:
-// import checkDeadlines from "./services/notificationWorker.js";
-
 const app = express();
 
-// CORS sekali saja, rapi
-const allowedOrigins =
-  process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()).filter(Boolean) || [];
+/* =====================
+   MIDDLEWARE
+===================== */
+
+// CORS SATU KALI SAJA
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+  : [];
 
 app.use(
   cors({
@@ -46,10 +48,16 @@ app.use(
 
 app.use(express.json());
 
-// root health
-app.get("/", (_, res) => res.send("API OK"));
+/* =====================
+   HEALTH
+===================== */
+app.get("/", (req, res) => {
+  res.send("API OK");
+});
 
-// routes (biarkan sama persis)
+/* =====================
+   ROUTES
+===================== */
 app.use("/api/auth", authRoutes);
 app.use("/api/pendaftaran", pendaftaranRoutes);
 app.use("/api/pembayaran", pembayaranRoutes);
@@ -62,6 +70,7 @@ app.use("/api/tugas", tugasRoutes);
 app.use("/api/pengumpulan", pengumpulanTugasRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/mentor", mentorRoutes);
+
 app.use("/api/admin", adminAuthRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/admin/fakultas", adminFakultasRoutes);
@@ -72,31 +81,29 @@ app.use("/api/admin/tugas", adminTugasRoutes);
 app.use("/api/admin", adminPengumpulanTugasRoutes);
 app.use("/api/admin/siswa", adminSiswaRoutes);
 
-// analytics (tetap)
 app.use("/api/admin/analytics", adminAnalyticsRoutes);
 app.use("/api/admin", adminAnalyticsPieRoutes);
 app.use("/api/admin/activities", adminActivitiesRoutes);
 
-// admin routes PALING BAWAH
+// ADMIN PALING BAWAH
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/notifikasi", notifikasiRoutes);
 
+/* =====================
+   DEBUG (AMAN)
+===================== */
 app.get("/api/debug/env", (req, res) => {
   res.json({
     SUPABASE_URL: !!process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_SERVICE_ROLE: !!process.env.SUPABASE_SERVICE_ROLE,
     SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
     JWT_SECRET: !!process.env.JWT_SECRET,
     NODE_ENV: process.env.NODE_ENV,
   });
 });
 
-/**
- * checkDeadlines() jangan dijalankan di Vercel serverless.
- * Nanti kita bikin endpoint khusus (mis: /api/cron/check-deadlines)
- * lalu dijalankan pakai Vercel Cron.
- */
-
-// ini yang dibutuhkan gateway Vercel
+/* =====================
+   EXPORT UNTUK VERCEL
+===================== */
 export default app;

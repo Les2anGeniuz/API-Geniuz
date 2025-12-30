@@ -10,98 +10,104 @@ function normalizeEmail(email) {
 }
 
 function signToken(payload) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET missing");
+  }
+
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
   });
 }
 
-// POST /api/auth/register
+/* =========================
+   REGISTER
+========================= */
 export async function register(req, res) {
   try {
-    const nama_lengkap = req.body?.nama_lengkap ?? null;
-    const email = normalizeEmail(req.body?.email);
-    const password = String(req.body?.password || "");
+    const { nama_lengkap = null, email, password } = req.body || {};
+    const cleanEmail = normalizeEmail(email);
 
-    if (!email || !password) return res.status(400).json({ error: "Email & password wajib" });
-    if (password.length < 6) return res.status(400).json({ error: "Password minimal 6 karakter" });
+    if (!cleanEmail || !password) {
+      return res.status(400).json({ error: "Email & password wajib" });
+    }
 
-    // cek email exist
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password minimal 6 karakter" });
+    }
+
     const { data: exist, error: exErr } = await supabaseAdmin
       .from(TABLE)
       .select("id_User")
-      .eq("email", email)
-      .limit(1);
+      .eq("email", cleanEmail)
+      .maybeSingle();
 
-    if (exErr) return res.status(500).json({ error: exErr.message });
-    if (exist && exist.length) return res.status(409).json({ error: "Email sudah terdaftar" });
+    if (exErr) throw exErr;
+    if (exist) {
+      return res.status(409).json({ error: "Email sudah terdaftar" });
+    }
 
     const hashed = await bcrypt.hash(password, SALT_ROUNDS);
 
     const { data, error } = await supabaseAdmin
       .from(TABLE)
-      .insert([{ nama_lengkap, email, password: hashed }])
+      .insert([{ nama_lengkap, email: cleanEmail, password: hashed }])
       .select("id_User, email, nama_lengkap, created_at")
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) throw error;
 
-    const token = signToken({ id_User: data.id_User, email: data.email });
+    const token = signToken({
+      id_User: data.id_User,
+      email: data.email,
+    });
+
     return res.status(201).json({
       message: "Registrasi berhasil",
       user: data,
       access_token: token,
     });
-  } catch (e) {
-    console.error("[REGISTER ERROR]", e);
-    return res.status(500).json({ error: e?.message || "Internal server error" });
+  } catch (err) {
+    console.error("[REGISTER ERROR]", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }
 
-// POST /api/auth/login
+/* =========================
+   LOGIN
+========================= */
 export async function login(req, res) {
   try {
-    const email = normalizeEmail(req.body?.email);
-    const password = String(req.body?.password || "");
+    const { email, password } = req.body || {};
+    const cleanEmail = normalizeEmail(email);
 
-    // DEBUG: biar tau payload masuk bener apa nggak
-    console.log("[LOGIN BODY]", { email, hasPassword: !!password, passLen: password.length });
-
-    if (!email || !password) return res.status(400).json({ error: "Email & password wajib" });
+    if (!cleanEmail || !password) {
+      return res.status(400).json({ error: "Email & password wajib" });
+    }
 
     const { data: user, error } = await supabaseAdmin
       .from(TABLE)
       .select("id_User, email, password, nama_lengkap, created_at")
-      .eq("email", email)
-      .single();
+      .eq("email", cleanEmail)
+      .maybeSingle();
 
-    // DEBUG: ketemu user atau nggak
-    console.log("[LOGIN SELECT]", { found: !!user, error: error?.message || null });
-
-    // untuk keamanan: tetap balikin pesan sama
-    if (error || !user) return res.status(401).json({ error: "Email atau password salah" });
-
-    // DEBUG: password field kebaca atau nggak
-    console.log("[LOGIN PASSWORD FIELD]", {
-      isNull: user.password == null,
-      prefix: user.password ? String(user.password).slice(0, 4) : null,
-    });
-
-    if (!user.password) {
-      // biasanya karena env supabaseAdmin salah (bukan service role) / policy keblok
-      console.error("[LOGIN ERROR] Password hash tidak kebaca dari DB.");
+    if (error || !user) {
       return res.status(401).json({ error: "Email atau password salah" });
     }
 
-    const ok = await bcrypt.compare(password, user.password);
+    if (!user.password) {
+      return res.status(401).json({ error: "Email atau password salah" });
+    }
 
-    // DEBUG: bcrypt match?
-    console.log("[LOGIN BCRYPT]", { ok });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: "Email atau password salah" });
+    }
 
-    if (!ok) return res.status(401).json({ error: "Email atau password salah" });
+    const token = signToken({
+      id_User: user.id_User,
+      email: user.email,
+    });
 
-    const token = signToken({ id_User: user.id_User, email: user.email });
-
-    // jangan bocorin hash
     delete user.password;
 
     return res.status(200).json({
@@ -109,13 +115,15 @@ export async function login(req, res) {
       user,
       access_token: token,
     });
-  } catch (e) {
-    console.error("[LOGIN CATCH]", e);
-    return res.status(500).json({ error: e?.message || "Internal server error" });
+  } catch (err) {
+    console.error("[LOGIN ERROR]", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }
 
-// GET /api/auth/me
+/* =========================
+   ME
+========================= */
 export async function me(req, res) {
   return res.status(200).json({ user: req.user });
 }
