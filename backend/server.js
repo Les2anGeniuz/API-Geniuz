@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 
 import authRoutes from "./routes/auth.js";
 import pendaftaranRoutes from "./routes/pendaftaran.js";
@@ -31,8 +30,6 @@ import notifikasiRoutes from "./routes/notifikasi.js";
 
 // Jangan auto-run worker di serverless:
 // import checkDeadlines from "./services/notificationWorker.js";
-
-dotenv.config();
 
 const app = express();
 

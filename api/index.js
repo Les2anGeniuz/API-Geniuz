@@ -1,8 +1,3 @@
-import serverless from "serverless-http";
+// api/index.js
 import app from "../backend/server.js";
-
-const handler = serverless(app);
-
-export default function (req, res) {
-  return handler(req, res);
-}
+export default app;
