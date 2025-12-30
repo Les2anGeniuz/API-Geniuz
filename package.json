@@ -2,7 +2,8 @@
   "name": "api-geniuz",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
-    "serverless-http": "^4.0.0"
+    "bcryptjs": "^3.0.3"
   }
 }
