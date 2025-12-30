@@ -35,9 +35,8 @@ const app = express();
 ===================== */
 
 // CORS SATU KALI SAJA
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
-  : [];
+const allowedOrigins =
+  process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()).filter(Boolean) || [];
 
 app.use(
   cors({
@@ -93,12 +92,14 @@ app.use("/api/notifikasi", notifikasiRoutes);
 /* =====================
    DEBUG (AMAN)
 ===================== */
-app.get("/api/debug/env", (req, res) => {
+app.get("/api/debug/env", (_, res) => {
   res.json({
     SUPABASE_URL: !!process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE: !!process.env.SUPABASE_SERVICE_ROLE,
+    SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
     JWT_SECRET: !!process.env.JWT_SECRET,
+    JWT_SECRET_ADMIN: !!process.env.JWT_SECRET_ADMIN,
+    CORS_ORIGIN: process.env.CORS_ORIGIN || null,
     NODE_ENV: process.env.NODE_ENV,
   });
 });
